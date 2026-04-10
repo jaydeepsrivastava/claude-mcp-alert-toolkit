@@ -1,0 +1,34 @@
+# ── Credentials & secrets ─────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Node (ir-logs MCP) ────────────────────────────────────────────────────────
+mcp-servers/ir-logs/node_modules/
+mcp-servers/ir-logs/*.log
+
+# ── Python (devops-assistant MCP) ─────────────────────────────────────────────
+mcp-devops-demo/.venv/
+mcp-devops-demo/__pycache__/
+mcp-devops-demo/*.pyc
+**/__pycache__/
+**/*.pyc
+
+# ── Inventory (internal hostnames — keep out of public repos) ─────────────────
+inventory.json
+inventory_rt_nrt.json
+
+# ── Claude Desktop config (machine-specific paths) ───────────────────────────
+claude_desktop_config.json
+
+# ── OS / Editor ───────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# ── Logs & temp ───────────────────────────────────────────────────────────────
+*.log
+*.bak

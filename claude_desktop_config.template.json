@@ -1,0 +1,47 @@
+{
+  "_comment": "Copy this file to %APPDATA%\\Claude\\claude_desktop_config.json (Windows) and replace all <PLACEHOLDERS>.",
+  "mcpServers": {
+
+    "mindbender": {
+      "_comment": "Jira/project-management MCP — remote HTTP, no local setup needed",
+      "command": "cmd.exe",
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "mcp-remote",
+        "https://mindbender.cceng.8x8.com/mcp"
+      ]
+    },
+
+    "devops-assistant": {
+      "_comment": "Local Python MCP for disk/CPU/memory/ping/log search. Runs inside WSL.",
+      "command": "wsl",
+      "args": [
+        "/home/<YOUR_WSL_USER>/jaydeep_claude/mcp-devops-demo/.venv/bin/python3",
+        "/home/<YOUR_WSL_USER>/jaydeep_claude/mcp-devops-demo/server.py"
+      ]
+    },
+
+    "ir-logs": {
+      "_comment": "Node.js MCP — fetches IR logs from contactual hosts via SSH. Runs inside WSL.",
+      "command": "wsl",
+      "args": [
+        "node",
+        "/home/<YOUR_WSL_USER>/jaydeep_claude/mcp-servers/ir-logs/server.js"
+      ],
+      "env": {
+        "INVENTORY_PATH": "/home/<YOUR_WSL_USER>/jaydeep_claude/inventory.json",
+        "IR_SSH_USER":    "contactual",
+        "IR_SSH_KEY":     "/home/<YOUR_WSL_USER>/.ssh/id_ed25519"
+      }
+    }
+
+  },
+  "preferences": {
+    "coworkScheduledTasksEnabled": false,
+    "ccdScheduledTasksEnabled": false,
+    "coworkWebSearchEnabled": true,
+    "sidebarMode": "chat"
+  }
+}

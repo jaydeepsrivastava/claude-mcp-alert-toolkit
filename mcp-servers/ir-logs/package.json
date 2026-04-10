@@ -1,0 +1,15 @@
+{
+  "name": "ir-logs-mcp",
+  "version": "1.0.0",
+  "description": "MCP server to fetch IR logs from multiple servers via SSH",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "ssh2": "^1.16.0",
+    "zod": "^3.22.4"
+  }
+}
