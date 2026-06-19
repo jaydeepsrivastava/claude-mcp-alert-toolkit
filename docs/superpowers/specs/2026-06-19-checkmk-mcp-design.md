@@ -67,10 +67,9 @@ mcp-servers/
 ### Component Breakdown
 
 **`client.py` — CheckMKClient**
-- Takes `url`, `site`, `user`, `secret` from env vars
-- Builds base URL: `{CHECKMK_URL}/{CHECKMK_SITE}/check_mk/api/1.0`
-- Auth: HTTP Basic (`CHECKMK_USER:CHECKMK_SECRET`) — matches existing env vars
-- SSL: configurable via `CHECKMK_VERIFY_SSL` (default `true`; set `false` for self-signed certs)
+- Takes full base URL from `CHECKMK_BASE_URL` env var (already includes site path)
+- Auth: Bearer token — `Authorization: Bearer <CHECKMK_TOKEN>` (CheckMK automation token format)
+- HTTP (not HTTPS) — no SSL context needed for this instance
 - Timeout: `CHECKMK_TIMEOUT` (default 30s)
 - Method: single `get(endpoint, params)` — no write methods
 - Error handling: maps 401/403/404/5xx to descriptive strings (not exceptions) so Claude gets readable output
@@ -84,16 +83,20 @@ mcp-servers/
 
 ## 6. Environment Variables
 
-| Variable | Maps To | Notes |
+| Variable | Value | Notes |
 |---|---|---|
-| `CHECKMK_URL` | CheckMK server base URL | e.g. `https://checkmk.8x8.com` — **already in .env** |
-| `CHECKMK_SITE` | CheckMK site name | e.g. `cmk` — **needs to be filled in** |
-| `CHECKMK_USER` | Automation user | **already in .env** |
-| `CHECKMK_SECRET` | Automation password | **already in .env** |
-| `CHECKMK_VERIFY_SSL` | SSL verification | Optional, default `true`; set `false` for self-signed certs |
-| `CHECKMK_TIMEOUT` | Request timeout (seconds) | Optional, default `30` |
+| `CHECKMK_BASE_URL` | `http://us2mastermon.us2.whitepj.net/vccmaster/check_mk/api/1.0` | Full API base URL — confirmed working |
+| `CHECKMK_TOKEN` | `automation <uuid>` | Bearer token — `Authorization: Bearer <token>` |
+| `CHECKMK_TIMEOUT` | `30` | Optional, default 30s |
 
-> **Note:** vibeMK uses `CHECKMK_USERNAME`/`CHECKMK_PASSWORD`. Our server uses `CHECKMK_USER`/`CHECKMK_SECRET` to match existing env vars in `.env`. This is intentional — do not change the env var names.
+**CheckMK instance confirmed:**
+- Version: `2.2.0p11.cee` (Enterprise Edition)
+- Site: `vccmaster`
+- Host: `us2mastermon.us2.whitepj.net` (US2 master monitor)
+- Protocol: HTTP (no SSL)
+- Auth: Bearer token (automation user secret format)
+
+> **Security note:** Store `CHECKMK_TOKEN` in `.env` only — never in code or committed files.
 
 ---
 
@@ -124,15 +127,18 @@ Update `docs/api-reference.md` — CheckMK section now secondary (MCP preferred)
 
 ---
 
-## 9. What's Missing / Needs Confirmation Before Build
+## 9. Pre-Build Checklist — ALL CONFIRMED
 
-| Item | Status | Action Needed |
+| Item | Status | Detail |
 |---|---|---|
-| CheckMK host URL | Unknown | Confirm `CHECKMK_URL` value from `.env` |
-| CheckMK site name | Unknown | Confirm the site name (e.g. `cmk`, `monitoring`, `prod`) — needed for URL path |
-| CheckMK version | Unknown | REST API v1 (2.x) vs older? Affects endpoint paths |
-| SSL cert | Unknown | Is cert self-signed? Set `CHECKMK_VERIFY_SSL=false` if so |
-| Automation user exists | Unknown | Confirm automation user is created in CheckMK (Setup → Users) |
+| CheckMK base URL | ✅ Confirmed | `http://us2mastermon.us2.whitepj.net/vccmaster/check_mk/api/1.0` |
+| CheckMK version | ✅ Confirmed | `2.2.0p11.cee` — REST API v1 endpoints valid |
+| Auth method | ✅ Confirmed | Bearer token, `Authorization: Bearer automation <uuid>` |
+| SSL | ✅ Not needed | HTTP only |
+| Connection test | ✅ Passed | `/version` returns 200; service list query returns live data |
+| Automation user | ✅ Active | Token accepted, data returned |
+
+**Ready to build.** No blockers.
 
 ---
 
