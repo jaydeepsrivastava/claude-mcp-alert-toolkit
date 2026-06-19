@@ -62,12 +62,21 @@ def checkmk_list_problems() -> str:
 def checkmk_get_host_status(hostname: str) -> str:
     """Get the up/down status of a specific host. Use to confirm whether an alert is host-level or service-level."""
     client = _client()
-    result = client.get(f"objects/host/{hostname}")
+    result = client.get(
+        "domain-types/host/collections/all",
+        params={
+            "query": json.dumps({"op": "=", "left": "name", "right": hostname}),
+            "columns": ["name", "state", "address", "plugin_output"],
+        },
+    )
     if _is_error(result):
         return result
     assert isinstance(result, dict)
 
-    ext = result.get("extensions", {})
+    hosts = result.get("value", [])
+    if not hosts:
+        return f"❌ Host not found: {hostname}"
+    ext = hosts[0].get("extensions", {})
     state = _STATE_HOST.get(ext.get("state"), "UNKNOWN")
     return (
         f"Host: {hostname}\n"
@@ -82,12 +91,27 @@ def checkmk_get_service_status(hostname: str, service_name: str) -> str:
     """Get detailed status of one service on a host. Use during FULL context investigation when both host and service name are known.
     service_name: exact CheckMK service name (e.g. 'CPU load', 'Disk IO SUMMARY', 'Memory')"""
     client = _client()
-    result = client.get(f"objects/service/{hostname}~{service_name}")
+    result = client.get(
+        "domain-types/service/collections/all",
+        params={
+            "query": json.dumps({
+                "op": "and",
+                "expr": [
+                    {"op": "=", "left": "host_name", "right": hostname},
+                    {"op": "=", "left": "description", "right": service_name},
+                ],
+            }),
+            "columns": ["host_name", "description", "state", "plugin_output", "last_check"],
+        },
+    )
     if _is_error(result):
         return result
     assert isinstance(result, dict)
 
-    ext = result.get("extensions", {})
+    services = result.get("value", [])
+    if not services:
+        return f"❌ Service not found: {hostname} / {service_name}"
+    ext = services[0].get("extensions", {})
     state = _STATE_SVC.get(ext.get("state"), "?")
     return (
         f"Host: {hostname}\n"

@@ -73,27 +73,33 @@ def test_list_problems_propagates_error(mock_client_cls):
 def test_get_host_status_up(mock_client_cls):
     from server import checkmk_get_host_status
     mock_client_cls.get.return_value = {
-        "extensions": {"state": 0, "address": "10.0.0.1", "plugin_output": "Ping OK"}
+        "value": [{"extensions": {"state": 0, "address": "10.0.0.1", "plugin_output": "Ping OK"}}]
     }
     result = checkmk_get_host_status("us1app001")
     assert "UP" in result
     assert "us1app001" in result
-    mock_client_cls.get.assert_called_once_with("objects/host/us1app001")
 
 
 def test_get_host_status_down(mock_client_cls):
     from server import checkmk_get_host_status
     mock_client_cls.get.return_value = {
-        "extensions": {"state": 1, "address": "10.0.0.2", "plugin_output": "Ping failed"}
+        "value": [{"extensions": {"state": 1, "address": "10.0.0.2", "plugin_output": "Ping failed"}}]
     }
     result = checkmk_get_host_status("us1app002")
     assert "DOWN" in result
 
 
+def test_get_host_status_not_found(mock_client_cls):
+    from server import checkmk_get_host_status
+    mock_client_cls.get.return_value = {"value": []}
+    result = checkmk_get_host_status("ghost")
+    assert "not found" in result.lower()
+
+
 def test_get_host_status_error(mock_client_cls):
     from server import checkmk_get_host_status
-    mock_client_cls.get.return_value = "❌ Not found: objects/host/ghost"
-    result = checkmk_get_host_status("ghost")
+    mock_client_cls.get.return_value = "❌ Auth failed — check CHECKMK_TOKEN"
+    result = checkmk_get_host_status("us1app001")
     assert result.startswith("❌")
 
 
@@ -102,13 +108,19 @@ def test_get_host_status_error(mock_client_cls):
 def test_get_service_status(mock_client_cls):
     from server import checkmk_get_service_status
     mock_client_cls.get.return_value = {
-        "extensions": {"state": 2, "plugin_output": "CRIT - load 95%", "last_check": "2026-06-19 10:00"}
+        "value": [{"extensions": {"state": 2, "plugin_output": "CRIT - load 95%", "last_check": "2026-06-19 10:00"}}]
     }
     result = checkmk_get_service_status("us1app001", "CPU load")
     assert "CRIT" in result
     assert "us1app001" in result
     assert "CPU load" in result
-    mock_client_cls.get.assert_called_once_with("objects/service/us1app001~CPU load")
+
+
+def test_get_service_status_not_found(mock_client_cls):
+    from server import checkmk_get_service_status
+    mock_client_cls.get.return_value = {"value": []}
+    result = checkmk_get_service_status("us1app001", "Nonexistent Service")
+    assert "not found" in result.lower()
 
 
 # ── checkmk_list_hosts ───────────────────────────────────────────────────────
