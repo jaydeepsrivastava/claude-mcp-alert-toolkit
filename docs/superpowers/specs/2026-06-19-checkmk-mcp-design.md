@@ -20,13 +20,13 @@ This server exposes **read-only** operations only. No writes, no acknowledges, n
 
 ## 3. Reference Repos Reviewed
 
-### 3.1 chexma/vibeMK (external)
+### 3.1 chexma/vibeMK (external) — REJECTED
 - **URL:** https://github.com/chexma/vibeMK
 - **Language:** Python (raw JSON-RPC stdin/stdout — no FastMCP)
 - **Scope:** Full CRUD — 60+ tools covering hosts, services, users, rules, rulesets, downtimes, acknowledgements, discovery, metrics, passwords
-- **API client:** `api/client.py` — well-structured, handles auto URL detection (5 URL patterns tried), SSL context, retry with exponential backoff, all HTTP methods
-- **Config vars:** `CHECKMK_SERVER_URL`, `CHECKMK_SITE`, `CHECKMK_USERNAME`, `CHECKMK_PASSWORD`, `CHECKMK_VERIFY_SSL`, `CHECKMK_TIMEOUT`, `CHECKMK_MAX_RETRIES`
-- **Decision:** Too large for our needs. We borrow the **API client pattern** (URL detection, SSL, retry) but not the full server. We use FastMCP instead of raw JSON-RPC.
+- **API client:** `api/client.py` — auto URL detection, SSL context, retry with exponential backoff
+- **Why rejected:** Creator explicitly marks it alpha and states "Do not use in production." Forum thread (https://forum.checkmk.com/t/vibemk-connect-checkmk-to-ai-llms/55364) confirms community consensus: "It cannot be used" — unpredictable LLM behavior, risk of accidental destructive actions on live monitoring. **No code borrowed from vibeMK.**
+- **Decision:** Build from scratch. Our GET-only scope eliminates the accidental-write risk that makes vibeMK dangerous.
 
 ### 3.2 8x8/contact-center-tools (internal)
 - **URL:** https://github.com/8x8/contact-center-tools (cloned at `/home/jaydeep/jaydeep_claude/contact-center-tools/`)
