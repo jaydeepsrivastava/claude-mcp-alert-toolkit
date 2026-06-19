@@ -1,291 +1,99 @@
 # Alert Investigation Workflow
 
 ## Project Purpose
-Investigate PagerDuty / CheckMK alerts, link them to Jira tickets,
-identify root causes, and suggest permanent mitigations — not just quick fixes.
-
----
+Investigate PagerDuty / CheckMK alerts, link Jira tickets, identify root causes, suggest permanent mitigations.
 
 ## Security: .env Files
-**Never read, print, or expose the contents of any `.env` file.**
-Credentials are loaded from environment variables at runtime only.
-A hook enforces this at the tool level (see `.claude/settings.json`).
-If env vars are missing, tell the user which ones are needed — do not try to read the file.
-
----
+**Never read, print, or expose any `.env` file.** Use exported env vars only. If missing, tell user which vars are needed.
 
 ## Connections
+- **Jira**: MCP `mindbender` | project `VCC` | label `pagerduty-alert` | types: INC, RP, MW, DEP, PRB, CHG
+- **PagerDuty**: `https://api.pagerduty.com` | env `PAGERDUTY_API_KEY`
+- **CheckMK**: MCP `checkmk` (preferred) | env `CHECKMK_BASE_URL`, `CHECKMK_TOKEN` | curl fallback: `docs/api-reference.md`
 
-### Jira
-- MCP: `mindbender` (already connected)
-- Project key: `[FILL IN — e.g. VCC, OPS, INFRA]`
-- Alert tickets use label: `[FILL IN — e.g. pagerduty-alert]`
-- Ticket types to cross-check: `INC`, `RP`, `MW`, `DEP`, `PRB`, `CHG`
+See `docs/api-reference.md` for curl templates.
 
-### PagerDuty
-- Base URL: `https://api.pagerduty.com`
-- Credentials: env var `PAGERDUTY_API_KEY`
-- [FILL IN — your PagerDuty subdomain/account name]
+## Investigation Workflow
+1. Fetch alert — PagerDuty/CheckMK via curl, IR logs via `ir-logs` MCP, OCI/Loki via skills, host diagnostics via `devops-assistant`
+2. Read Jira ticket via mindbender `get_issue`
+3. JIRA cross-check — MW, DEP, PRB, CHG, INC, RP
+4. Assess context level — FULL / PARTIAL / MINIMAL
+5. Search similar past incidents (`search_issues`)
+6. Rank root causes by probability with evidence
+7. Suggest permanent mitigation
+8. Update Jira via `add_comment`
 
-### CheckMK
-- Base URL: `https://[FILL IN — your checkmk host]/[site]/api/1.0`
-- Credentials: env vars `CHECKMK_USER`, `CHECKMK_SECRET`
-
----
-
-## Alert Investigation Workflow
-
-When given an alert, incident ID, or Jira ticket:
-
-1. **Fetch alert details** from PagerDuty or CheckMK via API (use Bash + curl)
-2. **Read the Jira ticket** using mindbender `get_issue`
-3. **JIRA cross-check** — query all relevant ticket types (MW, DEP, PRB, CHG, INC, RP) — see rules below
-4. **Assess context level** — determine FULL / PARTIAL / MINIMAL mode (see below)
-5. **Search for similar past incidents** in Jira using `search_issues` — detect recurrence
-6. **Identify root cause** — ranked by probability with evidence, not just the symptom
-7. **Suggest permanent mitigation** — see definition below
-8. **Update the Jira ticket** with findings, root cause, confidence score, and recommendation using `add_comment`
-
----
-
-## JIRA Ticket Cross-Check Rules
-
-After fetching the alert, query Jira for all of these within the relevant timeframe:
-
-| Ticket Type | JQL Example | Action |
+## JIRA Cross-Check Rules
+| Type | JQL | Action |
 |---|---|---|
-| `MW` (Maintenance Window) | `type = MW AND status != Done` | If active → suppress alert, inform user |
-| `DEP` (Deployment) | `type = DEP AND created >= -2h` | If deploy < 2h before alert → rollback is #1 recommendation |
-| `PRB` (Known Problem) | `type = PRB AND status != Done` | If match → apply documented workaround directly |
-| `CHG` (Change Request) | `type = CHG AND status = "In Progress"` | If active → correlate before escalating |
-| `INC` (Incident) | `type = INC AND labels = pagerduty-alert` | Link, do not duplicate |
-| `RP` (RP ticket) | `type = RP` | Standard cross-check |
+| MW | `type=MW AND status!=Done` | Active → suppress alert |
+| DEP | `type=DEP AND created>=-2h` | Deploy <2h before alert → rollback is #1 |
+| PRB | `type=PRB AND status!=Done` | Match → apply workaround directly |
+| CHG | `type=CHG AND status="In Progress"` | Correlate before escalating |
+| INC | `type=INC AND labels=pagerduty-alert` | Link, don't duplicate |
 
----
-
-## Context Level Assessment (FULL / PARTIAL / MINIMAL)
-
-Determine the context level from the user's input before responding:
-
-**FULL** — host + service + error all identified
-- Action: Resolve immediately with ranked root causes and steps
-
-**PARTIAL** — some signals present (e.g. host known but no error, or error but no host)
-- Action: Run parallel searches, show results, ask ≤2 targeted clarifying questions
-
-**MINIMAL** — only category guessable (e.g. "something is broken in prod")
-- Action: Show all active CRITICAL/WARNING alerts grouped by severity, ask user to identify which one
-
----
+## Context Levels
+- **FULL** (host+service+error): Resolve immediately with ranked root causes
+- **PARTIAL** (some signals): Run parallel searches, ask ≤2 clarifying questions
+- **MINIMAL** (category only): Show all active CRITICAL/WARNING alerts, ask user to identify
 
 ## Severity Mapping
-
-Map PagerDuty urgency + status to a severity badge on every response:
-
 | PD Urgency | PD Status | Badge |
 |---|---|---|
-| `high` | `triggered` | 🔴 CRITICAL |
-| `high` | `acknowledged` | ⚠️ WARNING |
-| `low` | any | 💡 INFO |
+| high | triggered | 🔴 CRITICAL |
+| high | acknowledged | ⚠️ WARNING |
+| low | any | 💡 INFO |
 
-Always display: `🔴 CRITICAL | <host> | <service> DOWN | <duration>`
-
----
-
-## Response Format Standard
-
-Every alert response must include these sections (omit only if data unavailable):
-
+## Response Format
 ```
 🔴 CRITICAL  |  <host>  |  <service> DOWN  |  <X> min
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📟  <PD incident ID>  |  On-call: <name>
-
-📋  JIRA SNAPSHOT
-    <MW/DEP/PRB/CHG/INC findings with action implications>
-
-📊  ROOT CAUSE — RANKED
-    #1  <X>%  <cause> — <evidence>
-    #2  <X>%  <cause> — <evidence>
-
-✅  RESOLUTION  •  <source>  •  <who>  •  <when>
-    Step 1: <command>
-    Step 2: <command>
-
-CONFIDENCE  <bar>  <X>%  <level>  •  Sources: <list>
+📋  JIRA SNAPSHOT — <MW/DEP/PRB/CHG/INC findings>
+📊  ROOT CAUSE — #1 <X>% <cause> — <evidence>
+✅  RESOLUTION  •  <source>  •  Steps: ...
+CONFIDENCE <X>% <level>  •  Sources: <list>
 ```
-
----
 
 ## Confidence Scoring
-
-Calculate and display a confidence score on every response:
-
-| Signal | Score |
-|---|---|
-| PD notes match same host | +35 |
-| JIRA correlation found (DEP/PRB) | +20 |
-| Confluence runbook found | +15 |
-| Similar past INC resolved same way | +10 |
-| Only Claude AI available (no data) | -30 |
-
-Display format: `CONFIDENCE: 78% GOOD ⚡ | Sources: PD Notes + JIRA DEP`
-
-Levels: `>= 85%` = HIGH, `>= 60%` = GOOD, `< 60%` = LOW
-
----
-
-## Root Cause Ranking
-
-After gathering all data sources, rank root causes by probability with evidence:
-
-- Use deploy timeline: if DEP ticket fired < 2h before alert, weight heavily
-- Use disk/resource metrics from PD alert body if available
-- Cross-reference recurrence: if same alert fired 3+ times in 30 days, flag pattern
-- Rule out causes explicitly: `✅ Network ruled out — ping OK, no network alerts in site`
-
----
+- PD notes match host: +35 | JIRA DEP/PRB: +20 | Confluence runbook: +15 | Past INC same fix: +10 | Claude only: -30
+- `>=85%` HIGH | `>=60%` GOOD | `<60%` LOW
 
 ## Resolution Source Hierarchy
+1. PD incident notes — +35
+2. Confluence runbook — +15
+3. Past resolved JIRA INC comments — +10
+4. JIRA PRB workaround — +20
+5. Claude general knowledge — last resort, -30
 
-Never rely on a single source. Work through these in order — stop at first hit, note which level was used in the confidence score:
+**When PD notes empty**: fall through 1→5. After fix confirmed, write back to both PD notes and JIRA INC:
+`Root cause / Fix applied / Verified by / Recurrence risk / Time to resolve`
 
-| Priority | Source | How to Query | Confidence Impact |
-|---|---|---|---|
-| 1 | **PD incident notes** | `GET /incidents/[ID]/notes` | +35 if found |
-| 2 | **Confluence runbook** | `search_knowledge_base(<alert name>)` | +15 if found |
-| 3 | **JIRA INC comments** (past resolved) | `search_issues: type=INC AND summary~"<service>" AND status=Done` | +10 if found |
-| 4 | **JIRA PRB workaround** | `search_issues: type=PRB AND summary~"<service>"` | +20 if found |
-| 5 | **Claude general knowledge** | Last resort only | -30 penalty |
-
-### What to do when PD notes are empty (most common case)
-
-1. Fall through to Confluence → JIRA INC → PRB in order
-2. If resolution found from any source, **guide the operator through the fix**
-3. After fix is confirmed working, **write back automatically**:
-   - Post resolution steps as a PD incident note (`POST /incidents/[ID]/notes`)
-   - Add a comment to the JIRA INC ticket with root cause + steps taken
-4. This builds the PD notes knowledge base over time — Claude is the note-taker, not just the note-reader
-
-### Write-back format (post to PD notes after resolution)
-```
-Root cause: <what failed and why>
-Fix applied: <exact commands or steps>
-Verified by: <how you confirmed it worked>
-Recurrence risk: <yes/no — link PRB if yes>
-Time to resolve: <X min>
-```
-
----
+## Root Cause Ranking
+- DEP <2h before alert → weight heavily
+- Use disk/resource metrics from PD alert body
+- 3+ same alerts in 30d → flag pattern, recommend PRB
+- Rule out causes explicitly: `✅ Network ruled out — ping OK`
 
 ## Recurrence Detection
+`search_issues: type=INC AND summary~"<service>" AND created>=-30d ORDER BY created DESC`
+3+ hits → flag pattern, recommend PRB if none exists.
 
-When investigating an alert, always run:
-```
-search_issues: type = INC AND summary ~ "<service>" AND created >= -30d ORDER BY created DESC
-```
+## Permanent Mitigation
+**Never**: restart service, acknowledge and monitor.
+**Do**: threshold tuning, infra fix, code fix (with file ref), runbook update, monitoring improvement, PRB ticket.
 
-If 3+ similar incidents found:
-- Flag as recurring pattern
-- Identify common root cause thread
-- Recommend raising a `PRB` ticket if none exists
-- Reference any open JIRA fix ticket (e.g. "JIRA-4799 would have prevented this")
+## MCP Tools
+- **mindbender** (Jira): `get_issue`, `search_issues` (clear cache first — results can be stale), `add_comment`, `transition_issue` | add `Generated by user: jsrivastava (Jaydeep Srivastava)` to all ticket descriptions
+- **ir-logs**: sites HK1/ON1/SK1/SY1/UK2/UK3/US1/US2/PA1/LH1 | tools: `list_ir_sites`, `list_ir_servers`, `get_ir_logs`, `search_ir_logs`, `get_ir_errors`, `get_ir_log_around_time`, `get_kafka_events`
+- **OCI logs**: skill `oci-log-mcp:oci-logs` (use `find_regions` first) | call traces: `oci-log-mcp:vcc-call-trace`
+- **Loki**: skill `loki-log-mcp:loki-logs` | ETRS: `loki-log-mcp:et-cross-site-health` | always `find_datasources` first (97 datasources; EU31 web pods on `k8s-oci-oke-prod-01-oci-logs`)
+- **devops-assistant**: `ping_host`, `disk_usage`, `cpu_processes`, `memory_usage`, `search_logs`
+- **checkmk** (read-only): `checkmk_test_connection`, `checkmk_list_problems`, `checkmk_get_host_status`, `checkmk_get_service_status`, `checkmk_list_hosts`, `checkmk_get_host_services` — call `checkmk_list_problems` first for MINIMAL context alerts
 
----
-
-## What "Permanent Mitigation" Means
-
-Do NOT suggest:
-- "Restart the service"
-- "Acknowledge and monitor"
-
-DO suggest:
-- Alerting threshold tuning (if alert was noisy/false positive)
-- Infrastructure fix (resource limits, config change)
-- Code fix (with file/function reference if known)
-- Runbook update (if no runbook exists or it's incomplete)
-- Monitoring improvement (add missing metric, fix check interval)
-- PRB ticket creation if recurring (3+ times same root cause)
-
----
-
-## API Reference (fill in after credentials collected)
-
-### PagerDuty — fetch incident
-```bash
-curl -s -H "Authorization: Token token=$PAGERDUTY_API_KEY" \
-     -H "Accept: application/vnd.pagerduty+json;version=2" \
-     "https://api.pagerduty.com/incidents/[INCIDENT_ID]"
-```
-
-### PagerDuty — list recent incidents
-```bash
-curl -s -H "Authorization: Token token=$PAGERDUTY_API_KEY" \
-     -H "Accept: application/vnd.pagerduty+json;version=2" \
-     "https://api.pagerduty.com/incidents?statuses[]=triggered&statuses[]=acknowledged"
-```
-
-### PagerDuty — fetch incident notes (operator resolution history)
-```bash
-curl -s -H "Authorization: Token token=$PAGERDUTY_API_KEY" \
-     -H "Accept: application/vnd.pagerduty+json;version=2" \
-     "https://api.pagerduty.com/incidents/[INCIDENT_ID]/notes"
-```
-
-### PagerDuty — write resolution note back (after fix confirmed)
-```bash
-curl -s -X POST \
-     -H "Authorization: Token token=$PAGERDUTY_API_KEY" \
-     -H "Accept: application/vnd.pagerduty+json;version=2" \
-     -H "Content-Type: application/json" \
-     -H "From: [FILL IN — on-call engineer email or bot email]" \
-     -d "{\"note\": {\"content\": \"[RESOLUTION STEPS]\"}}" \
-     "https://api.pagerduty.com/incidents/[INCIDENT_ID]/notes"
-```
-
-### CheckMK — get service status
-```bash
-curl -s -u "$CHECKMK_USER:$CHECKMK_SECRET" \
-     "https://[CHECKMK_HOST]/[SITE]/api/1.0/objects/service/[HOST]~[SERVICE]"
-```
-
-### CheckMK — list recent problems
-```bash
-curl -s -u "$CHECKMK_USER:$CHECKMK_SECRET" \
-     "https://[CHECKMK_HOST]/[SITE]/api/1.0/domain-types/service/collections/all?query={\"op\":\"=\",\"left\":\"state\",\"right\":\"2\"}"
-```
-
----
-
-## Environment Variables Required
-
-| Variable | Used For |
-|---|---|
-| `PAGERDUTY_API_KEY` | PagerDuty REST API auth |
-| `CHECKMK_USER` | CheckMK automation user |
-| `CHECKMK_SECRET` | CheckMK automation password |
-
-A `.env` file is present in the project root with all credentials pre-filled.
-
-Load them in your shell before starting Claude Code:
-```bash
-# Source the .env file (recommended)
-set -a && source .env && set +a
-
-# Or export individually if preferred
-export PAGERDUTY_API_KEY="..."
-export CHECKMK_USER="..."
-export CHECKMK_SECRET="..."
-```
-
-Or add `set -a && source /home/jaydeep/jaydeep_claude/.env && set +a` to `~/.bashrc` / `~/.zshrc` so they are always available.
-
-**Note:** Claude will never read or print the `.env` file directly. It only uses the variables once they are exported into the shell environment.
-
----
-
-## Notes
-- [FILL IN — any known recurring alert patterns specific to your infra]
-- [FILL IN — services you monitor and their criticality (e.g. SIP hosts, DB nodes, LBs, cache clusters)]
-- [FILL IN — on-call rotation / escalation context if relevant]
-- [FILL IN — CI/CD tool used (e.g. Helm, Ansible) for rollback command patterns]
+## Infrastructure
+- **IR Sites**: HK1, ON1, SK1, SY1, UK2, UK3, US1, US2, PA1, LH1
+- **SSH**: nested two-hop only (not `-J`); always ask user before SSH; UK3: jaydeep key → contactual → sudo root
+- **VCC Slots**: 1=2.1.1/200*, 2=2.1.2/300*, 3=2.1.3/400*, 4=2.1.0/100*
+- **Decom hosts**: us1grwp x003/x004 all slots — not in rotation, do not target
+- **CI/CD**: Ansible (infra), Helm (VCC services), git clone HTTPS only

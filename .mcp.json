@@ -1,0 +1,31 @@
+{
+  "mcpServers": {
+    "ir-logs": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["/home/jaydeep/jaydeep_claude/mcp-servers/ir-logs/server.js"]
+    },
+    "devops-assistant": {
+      "type": "stdio",
+      "command": "/home/jaydeep/jaydeep_claude/mcp-devops-demo/.venv/bin/python",
+      "args": ["/home/jaydeep/jaydeep_claude/mcp-devops-demo/server.py"]
+    },
+    "confluence": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": [
+        "mcp-atlassian",
+        "--confluence-spaces-filter",
+        "CCE"
+      ],
+      "env": {
+        "CONFLUENCE_URL": "https://confluence.8x8.com"
+      }
+    },
+    "checkmk": {
+      "type": "stdio",
+      "command": "/home/jaydeep/jaydeep_claude/mcp-servers/checkmk/.venv/bin/python",
+      "args": ["/home/jaydeep/jaydeep_claude/mcp-servers/checkmk/server.py"]
+    }
+  }
+}
