@@ -1,0 +1,5 @@
+mcp==1.26.0
+requests==2.32.3
+markdownify>=0.11.6
+pytest==8.3.5
+pytest-mock==3.14.0
