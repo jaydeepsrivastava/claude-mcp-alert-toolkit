@@ -12,15 +12,8 @@
     },
     "confluence": {
       "type": "stdio",
-      "command": "uvx",
-      "args": [
-        "mcp-atlassian",
-        "--confluence-spaces-filter",
-        "CCE"
-      ],
-      "env": {
-        "CONFLUENCE_URL": "https://confluence.8x8.com"
-      }
+      "command": "/home/jaydeep/jaydeep_claude/mcp-servers/confluence/.venv/bin/python",
+      "args": ["/home/jaydeep/jaydeep_claude/mcp-servers/confluence/server.py"]
     },
     "checkmk": {
       "type": "stdio",
