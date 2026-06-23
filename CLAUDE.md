@@ -89,6 +89,7 @@ CONFIDENCE <X>% <level>  •  Sources: <list>
 - **OCI logs**: skill `oci-log-mcp:oci-logs` (use `find_regions` first) | call traces: `oci-log-mcp:vcc-call-trace`
 - **Loki**: skill `loki-log-mcp:loki-logs` | ETRS: `loki-log-mcp:et-cross-site-health` | always `find_datasources` first (97 datasources; EU31 web pods on `k8s-oci-oke-prod-01-oci-logs`)
 - **devops-assistant**: `ping_host`, `disk_usage`, `cpu_processes`, `memory_usage`, `search_logs`
+- **Confluence**: MCP `confluence` (preferred) | tools: `confluence_test_connection`, `confluence_search`, `confluence_get_page` | curl fallback: `memory/reference_confluence_access.md`
 - **checkmk** (read-only): `checkmk_test_connection`, `checkmk_list_problems`, `checkmk_get_host_status`, `checkmk_get_service_status`, `checkmk_list_hosts`, `checkmk_get_host_services` — call `checkmk_list_problems` first for MINIMAL context alerts
 
 ## Infrastructure
