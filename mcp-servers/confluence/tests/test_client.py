@@ -16,7 +16,7 @@ def set_env(monkeypatch):
     monkeypatch.setenv("CONFLUENCE_TOKEN", "test-bearer-token")
     import importlib
     import client as c
-    importlib.reload(c)
+    importlib.reload(c)  # env vars are module-level globals; reload re-evaluates them
 
 
 def test_client_sends_cf_access_headers():
